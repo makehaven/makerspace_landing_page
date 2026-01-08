@@ -1,0 +1,7 @@
+name: 'Makerspace Landing Page'
+type: module
+description: 'Enhances Landing Page content type with robust tracking, coupons, and styling.'
+core_version_requirement: ^10 || ^11
+package: Makerspace
+dependencies:
+  - node
