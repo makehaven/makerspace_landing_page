@@ -1,0 +1,9 @@
+{
+    "name": "makehaven/makerspace_landing_page",
+    "description": "Enhances Landing Page content type with robust tracking, coupons, and styling.",
+    "type": "drupal-module",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "drupal/core": "^10 || ^11"
+    }
+}
