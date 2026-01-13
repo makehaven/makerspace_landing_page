@@ -9,7 +9,4 @@ dependencies:
   - paragraphs_library
   - entity_reference_revisions
   - quick_node_clone
-  - paragraphs
-  - entity_reference_revisions
-  - quick_node_clone
 

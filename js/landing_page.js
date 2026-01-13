@@ -6,25 +6,46 @@
 (function (Drupal, drupalSettings) {
   Drupal.behaviors.makerspaceLandingPage = {
     attach: function (context, settings) {
+      console.log('Makerspace Landing Page: Library attached.');
       // Ensure we have settings
       if (!settings.makerspace_landing_page) {
+        console.warn('Makerspace Landing Page: No settings found.');
         return;
       }
 
       const { coupon, tracking_code } = settings.makerspace_landing_page;
+      console.log('Makerspace Landing Page: Settings loaded', { coupon, tracking_code });
 
       // Apply Coupon
       if (coupon) {
         const chargebeeLinks = context.querySelectorAll('a[href*="makehaven.chargebee.com"]');
+        console.log(`Makerspace Landing Page: Found ${chargebeeLinks.length} Chargebee links.`);
+        
         chargebeeLinks.forEach(anchor => {
            try {
-            const url = new URL(anchor.href);
+            const url = new URL(anchor.href, window.location.origin);
+            let updated = false;
             if (!url.searchParams.has('subscription[coupon]')) {
               url.searchParams.set('subscription[coupon]', coupon);
+              updated = true;
+            }
+            if (!url.searchParams.has('coupon')) {
+              url.searchParams.set('coupon', coupon);
+              updated = true;
+            }
+            if (updated) {
               anchor.href = url.toString();
+              console.log('Makerspace Landing Page: Updated link', anchor.href);
             }
           } catch (e) {
-            // Ignore
+            console.error('Makerspace Landing Page: Error updating link', e);
+          }
+        });
+
+        const chargebeeElements = context.querySelectorAll('[data-cb-type], [data-cb-item-0-id], [data-cb-plan-id], [data-cb-item-0], [data-cb-item]');
+        chargebeeElements.forEach(element => {
+          if (!element.hasAttribute('data-cb-coupon') || !element.getAttribute('data-cb-coupon')) {
+            element.setAttribute('data-cb-coupon', coupon);
           }
         });
       }
