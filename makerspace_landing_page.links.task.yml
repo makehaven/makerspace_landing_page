@@ -1,0 +1,5 @@
+makerspace_landing_page.analytics_tab:
+  route_name: makerspace_landing_page.analytics
+  title: 'Analytics'
+  base_route: entity.node.canonical
+  weight: 20

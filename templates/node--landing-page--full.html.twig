@@ -1,0 +1,48 @@
+{#
+/**
+ * @file
+ * Theme override to display a node.
+ */
+#}
+{%
+  set classes = [
+    'node',
+    'node--type-' ~ node.bundle|clean_class,
+    node.isPromoted() ? 'node--promoted',
+    node.isSticky() ? 'node--sticky',
+    not node.isPublished() ? 'node--unpublished',
+    view_mode ? 'node--view-mode-' ~ view_mode|clean_class,
+    'landing-page-container',
+  ]
+%}
+{{ attach_library('makerspace_landing_page/landing_page') }}
+<article{{ attributes.addClass(classes) }}>
+
+  {{ title_prefix }}
+  {{ title_suffix }}
+
+  <div{{ content_attributes.addClass('node__content', 'landing-page-layout') }}>
+    
+    {% if content.analytics_link %}
+      <div class="col-12" style="margin-bottom: 20px;">
+        {{ content.analytics_link }}
+      </div>
+    {% endif %}
+
+    {% if content.field_landing_background %}
+      <div class="landing-page-hero-image">
+        {{ content.field_landing_background }}
+      </div>
+    {% endif %}
+
+    <div class="landing-page-body">
+      {{ content.body }}
+      {{ content|without('field_landing_background', 'body', 'field_landing_coupon_code', 'field_landing_tracking_code', 'field_custom_styles') }}
+    </div>
+
+  </div>
+  
+  {# Render custom styles if present, though ideally we move away from this #}
+  {{ content.field_custom_styles }}
+
+</article>

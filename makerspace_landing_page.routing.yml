@@ -1,0 +1,9 @@
+makerspace_landing_page.analytics:
+  path: '/node/{node}/landing-analytics'
+  defaults:
+    _controller: '\Drupal\makerspace_landing_page\Controller\LandingPageAnalyticsController::gotoAnalytics'
+    _title: 'Analytics'
+  requirements:
+    _permission: 'access administration pages'
+    _entity_bundles: 'node:landing_page'
+    node: \d+

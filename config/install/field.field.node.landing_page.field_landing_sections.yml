@@ -1,0 +1,24 @@
+uuid: 4c2c6743-98a0-4654-b9b1-4c38287214eb
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.storage.node.field_landing_sections
+    - node.type.landing_page
+  module:
+    - entity_reference_revisions
+id: node.landing_page.field_landing_sections
+field_name: field_landing_sections
+entity_type: node
+bundle: landing_page
+label: 'Page Sections'
+description: ''
+required: null
+translatable: null
+default_value: {  }
+default_value_callback: ''
+settings:
+  handler: 'default:node'
+  handler_settings: {  }
+field_type: entity_reference_revisions
+

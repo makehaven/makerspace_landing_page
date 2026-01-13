@@ -1,0 +1,35 @@
+uuid: 4aea52cb-a9e7-4718-b424-cc34a3bb1dec
+langcode: en
+status: true
+dependencies:
+  config:
+    - field.field.paragraph.section.field_section_content
+    - field.field.paragraph.section.field_section_title
+    - paragraphs.paragraphs_type.section
+  module:
+    - text
+id: paragraph.section.default
+targetEntityType: paragraph
+bundle: section
+mode: default
+content:
+  field_section_content:
+    type: text_default
+    label: above
+    settings: {  }
+    third_party_settings: {  }
+    weight: 1
+    region: content
+  field_section_title:
+    type: string
+    label: above
+    settings:
+      link_to_entity: false
+    third_party_settings: {  }
+    weight: 0
+    region: content
+hidden:
+  breadcrumbs: true
+  search_api_excerpt: true
+  uuid: true
+

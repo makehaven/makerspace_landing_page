@@ -47,4 +47,102 @@ function makerspace_landing_page_preprocess_node(&$variables) {
   if (!empty($settings)) {
     $variables['#attached']['drupalSettings']['makerspace_landing_page'] = $settings;
   }
+
+  // Add Analytics Link for admins
+  if (\Drupal::currentUser()->hasPermission('access administration pages')) {
+    $config = \Drupal::config('makerspace_landing_page.settings');
+    $property_id = $config->get('google_analytics_property');
+
+    if ($property_id) {
+        $node_path = $node->toUrl()->toString();
+        $encoded_path = urlencode(urlencode($node_path));
+        $url = "https://analytics.google.com/analytics/web/#/p{$property_id}/reports/explorer?params=_u..nav%3Dmaui%26_r.explorerCard..filterTerm%3D{$encoded_path}&r=all-pages-and-screens";
+        
+        $variables['content']['analytics_link'] = [
+          '#type' => 'link',
+          '#title' => t('View Page Analytics'),
+          '#url' => \Drupal\Core\Url::fromUri($url),
+          '#attributes' => [
+            'class' => ['btn', 'btn-sm', 'btn-info', 'my-3'],
+            'target' => '_blank',
+          ],
+          '#weight' => -100,
+        ];
+    }
+  }
+}
+
+/**
+ * Implements hook_preprocess_paragraph().
+
+
+/**
+ * Implements hook_preprocess_paragraph().
+ * 
+ * Replaces tokens [coupon], [tracking_code] in paragraph text.
+ */
+function makerspace_landing_page_preprocess_paragraph(&$variables) {
+  /** @var \Drupal\paragraphs\Entity\Paragraph $paragraph */
+  $paragraph = $variables['paragraph'];
+  $parent = $paragraph->getParentEntity();
+
+  if (!$parent || $parent->getEntityTypeId() !== 'node' || $parent->bundle() !== 'landing_page') {
+    return;
+  }
+
+  $replacements = [];
+  
+  // Get Coupon
+  if ($parent->hasField('field_landing_coupon_code') && !$parent->get('field_landing_coupon_code')->isEmpty()) {
+    $replacements['[coupon]'] = $parent->get('field_landing_coupon_code')->value;
+    $replacements['[coupon_code]'] = $parent->get('field_landing_coupon_code')->value;
+  }
+
+  // Get Tracking Code
+  if ($parent->hasField('field_landing_tracking_code') && !$parent->get('field_landing_tracking_code')->isEmpty()) {
+    $tracking = $parent->get('field_landing_tracking_code')->value;
+    $replacements['[tracking_code]'] = $tracking;
+    $replacements['[tracking]'] = $tracking;
+  }
+
+  if (empty($replacements)) {
+    return;
+  }
+
+  // Helper to recursively replace in render array
+  _makerspace_landing_page_recursive_replace($variables['content'], $replacements);
+}
+
+/**
+ * Helper to recursively replace strings in render array.
+ */
+function _makerspace_landing_page_recursive_replace(&$element, $replacements) {
+  if (!is_array($element)) {
+    return;
+  }
+
+  foreach ($element as $key => &$value) {
+    // Skip properties
+    if (strpos((string)$key, '#') === 0 && !in_array($key, ['#text', '#markup', '#title', '#plain_text'])) {
+      continue;
+    }
+    
+    if (is_array($value)) {
+      _makerspace_landing_page_recursive_replace($value, $replacements);
+    } elseif (is_string($value)) {
+      // Perform replacement
+      $value = strtr($value, $replacements);
+    }
+  }
+}
+
+/**
+ * Implements hook_theme().
+ */
+function makerspace_landing_page_theme() {
+  return [
+    'node__landing_page__full' => [
+      'base hook' => 'node',
+    ],
+  ];
 }
