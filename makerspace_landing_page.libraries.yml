@@ -9,3 +9,4 @@ landing_page:
   dependencies:
     - core/drupal
     - core/drupalSettings
+    - core/once
