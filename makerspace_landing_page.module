@@ -59,29 +59,6 @@ function makerspace_landing_page_preprocess_node(&$variables) {
   if ($node->hasField('field_landing_tracking_code') && isset($variables['content']['field_landing_tracking_code'])) {
       $variables['content']['field_landing_tracking_code']['#access'] = FALSE;
   }
-  
-  // Add Analytics Link logic (kept from before)
-  if ($variables['view_mode'] === 'full' && \Drupal::currentUser()->hasPermission('access administration pages')) {
-    $config = \Drupal::config('makerspace_landing_page.settings');
-    $property_id = $config->get('google_analytics_property');
-
-    if ($property_id) {
-        $node_path = $node->toUrl()->toString();
-        $encoded_path = urlencode(urlencode($node_path));
-        $url = "https://analytics.google.com/analytics/web/#/p{$property_id}/reports/explorer?params=_u..nav%3Dmaui%26_r.explorerCard..filterTerm%3D{$encoded_path}&r=all-pages-and-screens";
-        
-        $variables['content']['analytics_link'] = [
-          '#type' => 'link',
-          '#title' => t('View Page Analytics'),
-          '#url' => \Drupal\Core\Url::fromUri($url),
-          '#attributes' => [
-            'class' => ['btn', 'btn-sm', 'btn-info', 'my-3'],
-            'target' => '_blank',
-          ],
-          '#weight' => -100,
-        ];
-    }
-  }
 }
 
 /**
