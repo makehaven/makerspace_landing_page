@@ -57,14 +57,49 @@
             updateUrl(anchor, tracking_code);
         });
 
-        // 2. Add to specific targets if missing
-        const specificTargetsSelector = 'a[href*="/tour"]:not([href*="utm_campaign="]), a[href*="makehaven.chargebee.com"]:not([href*="utm_campaign="])';
-        once('makerspace-landing-tracking-targets', specificTargetsSelector, context).forEach(anchor => {
-            updateUrl(anchor, tracking_code);
+        // 2. Add to every conversion target that is still untagged.
+        once('makerspace-landing-tracking-targets', 'a[href]:not([href*="utm_campaign="])', context).forEach(anchor => {
+            if (isConversionTarget(anchor)) {
+              updateUrl(anchor, tracking_code);
+            }
         });
       }
     }
   };
+
+  /**
+   * Paths where a visitor converts, and which therefore need the campaign tag.
+   *
+   * This used to be a CSS attribute selector for `/tour` plus Chargebee, which
+   * silently missed most of the funnel: `/tour` is only a redirect, so a link
+   * written as `/open-tours` matched nothing, and the join links were never
+   * tagged at all — so "who joined from this campaign?" had no answer anywhere.
+   * Matched on the parsed pathname so a query string or anchor cannot hide them.
+   */
+  const CONVERSION_PATHS = [
+    '/tour',
+    '/open-tours',
+    '/join-makehaven',
+    '/take-next-step',
+    '/user/register',
+  ];
+
+  const CONVERSION_HOSTS = ['makehaven.chargebee.com'];
+
+  function isConversionTarget(anchor) {
+    try {
+      const url = new URL(anchor.href, window.location.origin);
+      if (CONVERSION_HOSTS.indexOf(url.hostname) !== -1) {
+        return true;
+      }
+      // Trailing-slash tolerant exact-or-prefix match, so `/tour` catches
+      // `/tour/` but never `/tournament`.
+      const path = url.pathname.replace(/\/+$/, '');
+      return CONVERSION_PATHS.some(p => path === p || path.endsWith(p));
+    } catch (e) {
+      return false;
+    }
+  }
 
   function updateUrl(anchor, campaign) {
       try {
