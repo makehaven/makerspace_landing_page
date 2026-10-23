@@ -1,0 +1,12 @@
+makerspace_landing_page.gift_card_print:
+  path: '/gift-card/print/{contribution_id}/{key}'
+  defaults:
+    _controller: '\Drupal\makerspace_landing_page\Controller\GiftCardController::print'
+    key: ''
+  requirements:
+    # The controller checks the key (or staff permission) itself: the buyer
+    # opens this from their receipt email without logging in.
+    _access: 'TRUE'
+    contribution_id: '\d+'
+  options:
+    no_cache: TRUE

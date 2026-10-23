@@ -1,6 +1,6 @@
 name: 'Makerspace Landing Page'
 type: module
-description: 'Enhances Landing Page content type with robust tracking, coupons, and styling.'
+description: 'Enhances Landing Page content type with robust tracking, coupons, and styling; prints fold-up gift cards for CiviCRM Gift Card orders.'
 core_version_requirement: ^10 || ^11
 package: Makerspace
 dependencies:
@@ -9,4 +9,5 @@ dependencies:
   - paragraphs_library
   - entity_reference_revisions
   - quick_node_clone
+  - civicrm:civicrm
 

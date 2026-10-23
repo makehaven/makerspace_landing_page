@@ -133,5 +133,18 @@ function makerspace_landing_page_theme() {
     'node__landing_page__full' => [
       'base hook' => 'node',
     ],
+    'makerspace_gift_card' => [
+      'variables' => [
+        'design' => [],
+        'to' => '',
+        'from' => '',
+        'message' => '',
+        'code' => '',
+        'asset_base' => '',
+        'css_url' => '',
+      ],
+      'template' => 'makerspace-gift-card',
+    ],
   ];
 }
+

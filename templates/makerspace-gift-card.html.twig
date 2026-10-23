@@ -1,0 +1,76 @@
+{#
+/**
+ * @file
+ * Printable quarter-fold gift card: one side of a letter sheet, folded twice.
+ *
+ * Panel layout on the sheet (top row prints upside down so it reads right side
+ * up once folded): top-left = inside right, top-right = inside left,
+ * bottom-left = back, bottom-right = front.
+ *
+ * Variables: design (trusted, from GiftCardDesigns), to, from, message, code
+ * (buyer-entered values; autoescaped), asset_base, css_url.
+ */
+#}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Your MakeHaven gift card</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Montserrat:ital,wght@0,400;0,700;1,400&display=swap">
+  <link rel="stylesheet" href="{{ css_url }}">
+</head>
+<body>
+  <div class="gc-help">
+    <h1>Your gift card is ready</h1>
+    <ol>
+      <li>Print this page on one side of a letter-size sheet, at 100% scale ("Actual size").</li>
+      <li>Fold it in half top to bottom, with the printing on the outside.</li>
+      <li>Fold it in half again, left to right. The front shows the headline.</li>
+    </ol>
+    <button type="button" class="gc-print" id="gc-print">Print the card</button>
+  </div>
+
+  <div class="gc-sheet">
+    <div class="gc-panel gc-flip">
+      <div class="gc-inside-r">
+        <p class="gc-to">For <b>{{ to }}</b></p>
+        {% if message %}<p class="gc-msg">“{{ message }}”</p>{% endif %}
+        {% if from %}<p class="gc-from">from {{ from }}</p>{% endif %}
+        <div class="gc-code"><small>Gift code</small><b>{{ code }}</b></div>
+        <p class="gc-redeem"><b>To start:</b> {{ design.redeem }}</p>
+      </div>
+    </div>
+    <div class="gc-panel gc-flip">
+      <div class="gc-inside-l">
+        <h2>{{ design.inside_title }}</h2>
+        <ul>
+          {% for item in design.items %}<li>{{ item|raw }}</li>{% endfor %}
+        </ul>
+        {% if design.footnote %}<p class="gc-foot">{{ design.footnote }}</p>{% endif %}
+      </div>
+    </div>
+    <div class="gc-panel">
+      <div class="gc-back">
+        <img src="{{ asset_base }}/logo.png" alt="MakeHaven">
+        <p>770 Chapel Street<br>New Haven, CT</p>
+        <p>makehaven.org</p>
+        <p class="gc-fine">No expiration. Not redeemable for cash. Members must be 18 or older.</p>
+      </div>
+    </div>
+    <div class="gc-panel gc-front">
+      <div class="gc-hexes">
+        <img src="{{ asset_base }}/hex-1.jpg" alt="">
+        <img src="{{ asset_base }}/hex-2.jpg" alt="">
+        <img src="{{ asset_base }}/hex-3.jpg" alt="">
+      </div>
+      <p class="gc-head">{{ design.headline }}</p>
+      <img class="gc-logo" src="{{ asset_base }}/logo.png" alt="MakeHaven">
+    </div>
+  </div>
+  <script>
+    document.getElementById('gc-print').addEventListener('click', function () { window.print(); });
+  </script>
+</body>
+</html>
