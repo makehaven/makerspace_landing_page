@@ -48,7 +48,7 @@ final class GiftCardDesigns {
         'inside_title' => 'What\'s inside',
         'items' => [
           '<b>3 months</b> of 24/7 makerspace membership',
-          '<b>GEMS</b>: 10 weeks of guided sessions with a coach and a small cohort',
+          '<b>GEMS</b> (Guided Exploration of Makerspace Skills): 10 weeks with a coach and a small cohort',
           '<b>Badges</b> on the laser cutter, woodshop, sewing machines and MIG welder',
           '<b>Materials</b> for the class projects',
         ],
