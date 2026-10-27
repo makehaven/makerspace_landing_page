@@ -148,3 +148,46 @@ function makerspace_landing_page_theme() {
   ];
 }
 
+
+/**
+ * Implements hook_civicrm_buildForm().
+ *
+ * Gift card order pages (contribution pages sold as the Gift Card financial
+ * type) read like a purchase, not a donation: the buttons say "order" instead
+ * of "contribution", and the card field sits in a labelled, outlined box so it
+ * is obvious where the card goes (Ashley, 2026-10-26).
+ */
+function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
+  if (!in_array($formName, ['CRM_Contribute_Form_Contribution_Main', 'CRM_Contribute_Form_Contribution_Confirm'], TRUE)) {
+    return;
+  }
+  $type_id = (int) ($form->_values['financial_type_id'] ?? 0);
+  if (!$type_id || \CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution', 'financial_type_id', $type_id) !== 'Gift Card') {
+    return;
+  }
+  $labels = [
+    '_qf_Main_upload' => t('Review your order'),
+    '_qf_Confirm_next' => t('Place order'),
+  ];
+  if ($form->elementExists('buttons')) {
+    foreach ($form->getElement('buttons')->getElements() as $button) {
+      $name = $button->getName();
+      // CiviCRM buttons are xbuttons whose content is "<icon> Label";
+      // keep the icon, swap the words.
+      if (isset($labels[$name]) && method_exists($button, 'setContent')) {
+        $content = (string) ($button->_content ?? '');
+        $icon = preg_match('/^(.*<\/i>)/s', $content, $m) ? $m[1] . ' ' : '';
+        $button->setContent($icon . htmlspecialchars((string) $labels[$name]));
+      }
+    }
+  }
+  if ($formName === 'CRM_Contribute_Form_Contribution_Main') {
+    $heading = json_encode((string) t('Card details'));
+    \Civi::resources()->addStyle('
+      #crm-payment-js-billing-form-container { border: 2px solid var(--mh-color-brand-primary, #8b1919); border-radius: 6px; padding: 14px 16px; margin: 12px 0 18px; background: #fff; }
+      #crm-payment-js-billing-form-container #card-element { padding: 10px 12px; border: 1px solid #b9b2ad; border-radius: 4px; }
+      #crm-payment-js-billing-form-container .mh-card-heading { font-weight: 600; margin: 0 0 8px; }
+    ');
+    \Civi::resources()->addScript('CRM.$(function($) { $("#crm-payment-js-billing-form-container").prepend($("<p class=\"mh-card-heading\"></p>").text(' . $heading . ')); });');
+  }
+}
