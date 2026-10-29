@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\makerspace_landing_page\GiftCard;
 
 use Civi\Api4\Contribution;
+use Civi\Api4\LineItem;
 use Drupal\civicrm\Civicrm;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\Database\Connection;
@@ -91,6 +92,15 @@ class GiftCardLedger {
     $delivery = (string) ($c['Gift_Card.Delivery'] ?? 'email');
     $after = !empty($c['Gift_Card.Contact_After']) ? strtotime((string) $c['Gift_Card.Contact_After']) : NULL;
     $kind = GiftCardMath::kindForPage($c['contribution_page_id.name'] ?? NULL);
+    $lines = LineItem::get(FALSE)
+      ->addSelect('qty', 'price_field_id.price_set_id.name', 'price_field_value_id.name')
+      ->addWhere('contribution_id', '=', $contribution_id)
+      ->execute();
+    $bonus = GiftCardMath::presetBonus(array_map(static fn(array $l) => [
+      'page' => $l['price_field_id.price_set_id.name'] ?? '',
+      'option' => $l['price_field_value_id.name'] ?? '',
+      'qty' => $l['qty'] ?? 1,
+    ], (array) $lines->getArrayCopy()));
 
     $card = [
       'code' => GiftCardMath::normalize($display),
@@ -106,7 +116,7 @@ class GiftCardLedger {
       'delivery' => in_array($delivery, ['email', 'recipient', 'mail'], TRUE) ? $delivery : 'email',
       'deliver_after' => $after ?: NULL,
       'paid_cents' => $cents,
-      'amount_cents' => $cents,
+      'amount_cents' => $cents + $bonus,
     ];
     try {
       $card = $this->create($card, 'Order ' . $c['id'], $c['receive_date'] ? strtotime((string) $c['receive_date']) : NULL);
@@ -130,6 +140,10 @@ class GiftCardLedger {
 
   /**
    * Creates a card with its opening "issue" transaction.
+   *
+   * The issue transaction is what was paid; any value beyond that (the
+   * multi-month savings) is a separate "adjust" on the bonus channel, so the
+   * monthly report can keep money received and promotions apart.
    *
    * @param array $values
    *   Column values; code, kind and amount_cents are required.
@@ -155,7 +169,11 @@ class GiftCardLedger {
     $transaction = $this->db->startTransaction();
     try {
       $id = (int) $this->db->insert(self::CARD)->fields($values)->execute();
-      $this->insertTxn($id, 'issue', $amount, $values['source'] ?? 'manual', '', $note, $when);
+      $paid = min((int) $values['paid_cents'], $amount);
+      $this->insertTxn($id, 'issue', $paid, $values['source'] ?? 'manual', '', $note, $when);
+      if ($amount > $paid) {
+        $this->insertTxn($id, 'adjust', $amount - $paid, 'bonus', '', 'Multi-month savings: worth ' . GiftCardMath::dollars($amount) . ', paid ' . GiftCardMath::dollars($paid), $when);
+      }
       $this->db->update(self::CARD)->fields(['balance_cents' => $amount, 'status' => $amount > 0 ? 'active' : 'used'])
         ->condition('id', $id)->execute();
     }
@@ -340,11 +358,12 @@ class GiftCardLedger {
    *
    * @return array
    *   Keys: sold (cents paid, by kind), sold_count, redeemed (cents, by
-   *   channel, positive), adjusted (cents, signed), owed_start and owed_end
+   *   channel, positive), bonus (cents of promotional value added),
+   *   adjusted (cents, signed: staff corrections and voids), owed_start and owed_end
    *   (total balance on all cards at each date).
    */
   public function monthReport(int $start, int $end): array {
-    $report = ['sold' => [], 'sold_count' => 0, 'redeemed' => [], 'adjusted' => 0];
+    $report = ['sold' => [], 'sold_count' => 0, 'redeemed' => [], 'bonus' => 0, 'adjusted' => 0];
     $issued = $this->db->query('SELECT c.kind, COUNT(*) n, SUM(c.paid_cents) paid FROM {' . self::CARD . '} c
       WHERE c.created >= :s AND c.created < :e AND c.source <> :legacy GROUP BY c.kind',
       [':s' => $start, ':e' => $end, ':legacy' => 'legacy'])->fetchAll();
@@ -358,6 +377,9 @@ class GiftCardLedger {
     foreach ($spent as $row) {
       if ($row->type === 'redeem') {
         $report['redeemed'][$row->channel] = ($report['redeemed'][$row->channel] ?? 0) - (int) $row->amount;
+      }
+      elseif ($row->channel === 'bonus') {
+        $report['bonus'] += (int) $row->amount;
       }
       else {
         $report['adjusted'] += (int) $row->amount;

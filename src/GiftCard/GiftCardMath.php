@@ -34,6 +34,37 @@ final class GiftCardMath {
   ];
 
   /**
+   * Extra value on the longer membership presets, by order page and option.
+   *
+   * The 6- and 12-month cards have always cost $25 and $50 less than their
+   * face value (the PayPal buttons did the same). The buyer pays the price;
+   * the card is worth the full months. The difference is a promotion, not
+   * money received, so the ledger records it apart from the sale.
+   */
+  public const PRESET_BONUS_CENTS = [
+    'membership_gift_card' => [
+      'six_months' => 2500,
+      'twelve_months' => 5000,
+    ],
+  ];
+
+  /**
+   * Bonus value on an order's line items.
+   *
+   * @param array $lines
+   *   Line items with keys page (price set name), option (price option name)
+   *   and qty.
+   */
+  public static function presetBonus(array $lines): int {
+    $bonus = 0;
+    foreach ($lines as $line) {
+      $per = self::PRESET_BONUS_CENTS[(string) ($line['page'] ?? '')][(string) ($line['option'] ?? '')] ?? 0;
+      $bonus += $per * max(1, (int) round((float) ($line['qty'] ?? 1)));
+    }
+    return $bonus;
+  }
+
+  /**
    * Upper case, letters and digits only: "7f3a-92c1 " and "7F3A92C1" match.
    */
   public static function normalize(string $code): string {
