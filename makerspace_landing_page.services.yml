@@ -1,0 +1,26 @@
+services:
+  makerspace_landing_page.gift_card_ledger:
+    class: Drupal\makerspace_landing_page\GiftCard\GiftCardLedger
+    arguments: ['@database', '@civicrm', '@datetime.time', '@current_user', '@logger.factory']
+
+  makerspace_landing_page.gift_card_chargebee:
+    class: Drupal\makerspace_landing_page\GiftCard\GiftCardChargebee
+    arguments: ['@http_client', '@config.factory', '@logger.factory']
+
+  makerspace_landing_page.gift_card_redeemer:
+    class: Drupal\makerspace_landing_page\GiftCard\GiftCardRedeemer
+    arguments: ['@makerspace_landing_page.gift_card_ledger', '@makerspace_landing_page.gift_card_chargebee', '@logger.factory']
+
+  makerspace_landing_page.gift_card_event_codes:
+    class: Drupal\makerspace_landing_page\GiftCard\GiftCardEventCodes
+    arguments: ['@makerspace_landing_page.gift_card_ledger', '@civicrm', '@logger.factory']
+
+  makerspace_landing_page.gift_card_delivery:
+    class: Drupal\makerspace_landing_page\GiftCard\GiftCardDelivery
+    arguments: ['@makerspace_landing_page.gift_card_ledger', '@civicrm', '@plugin.manager.mail', '@datetime.time', '@logger.factory']
+
+  makerspace_landing_page.gift_card_webhook_subscriber:
+    class: Drupal\makerspace_landing_page\EventSubscriber\GiftCardWebhookSubscriber
+    arguments: ['@queue']
+    tags:
+      - { name: event_subscriber }

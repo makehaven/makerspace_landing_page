@@ -191,3 +191,157 @@ function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
     \Civi::resources()->addScript('CRM.$(function($) { $("#crm-payment-js-billing-form-container").prepend($("<p class=\"mh-card-heading\"></p>").text(' . $heading . ')); });');
   }
 }
+
+/**
+ * Implements hook_civicrm_post().
+ *
+ * Issues the gift card as soon as a Gift Card order is paid. Waits for the
+ * CiviCRM transaction to commit, so a rolled-back payment never leaves a card
+ * behind. Cron catches anything this misses.
+ */
+function makerspace_landing_page_civicrm_post($op, $objectName, $objectId, &$objectRef) {
+  if ($objectName !== 'Contribution' || !in_array($op, ['create', 'edit'], TRUE) || !$objectId) {
+    return;
+  }
+  // Most contributions are donations and dues: skip them without a query.
+  $type_id = is_object($objectRef) ? (int) ($objectRef->financial_type_id ?? 0) : 0;
+  if ($type_id && \CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution', 'financial_type_id', $type_id) !== 'Gift Card') {
+    return;
+  }
+  $issue = static function (int $contribution_id): void {
+    try {
+      _makerspace_landing_page_issue_gift_card($contribution_id);
+    }
+    catch (\Throwable $e) {
+      \Drupal::logger('makerspace_landing_page')->error('Gift card for order @id not issued yet (cron will retry): @m', [
+        '@id' => $contribution_id,
+        '@m' => $e->getMessage(),
+      ]);
+    }
+  };
+  if (\CRM_Core_Transaction::isActive()) {
+    \CRM_Core_Transaction::addCallback(\CRM_Core_Transaction::PHASE_POST_COMMIT, $issue, [(int) $objectId], 'makerspace_gift_card_' . $objectId);
+  }
+  else {
+    $issue((int) $objectId);
+  }
+}
+
+/**
+ * Issues a Gift Card order's card and, for class credit, its discount code.
+ */
+function _makerspace_landing_page_issue_gift_card(int $contribution_id): void {
+  $card = \Drupal::service('makerspace_landing_page.gift_card_ledger')->issueFromContribution($contribution_id);
+  if ($card) {
+    \Drupal::service('makerspace_landing_page.gift_card_event_codes')->ensureCode($card);
+  }
+}
+
+/**
+ * Implements hook_cron().
+ *
+ * Gift cards: issue any paid order the post hook missed, record class
+ * registrations paid with gift cards, and email cards to recipients whose
+ * date has come.
+ */
+function makerspace_landing_page_cron() {
+  $logger = \Drupal::logger('makerspace_landing_page');
+  try {
+    \Drupal::service('civicrm')->initialize();
+    $orders = \Civi\Api4\Contribution::get(FALSE)
+      ->addSelect('id')
+      ->addWhere('financial_type_id:name', '=', 'Gift Card')
+      ->addWhere('contribution_status_id:name', '=', 'Completed')
+      ->addWhere('receive_date', '>=', date('Y-m-d', strtotime('-60 days')))
+      ->execute()->column('id');
+    $ledger = \Drupal::service('makerspace_landing_page.gift_card_ledger');
+    foreach ($orders as $id) {
+      if (!$ledger->findByContribution((int) $id)) {
+        _makerspace_landing_page_issue_gift_card((int) $id);
+      }
+    }
+    $recorded = \Drupal::service('makerspace_landing_page.gift_card_event_codes')->reconcile();
+    $sent = \Drupal::service('makerspace_landing_page.gift_card_delivery')->sendDue();
+    if ($recorded || $sent) {
+      $logger->info('Gift cards: @r class registrations recorded, @s cards emailed to recipients.', ['@r' => $recorded, '@s' => $sent]);
+    }
+  }
+  catch (\Throwable $e) {
+    $logger->error('Gift card cron failed: @m', ['@m' => $e->getMessage()]);
+  }
+}
+
+/**
+ * Implements hook_chargebee_portal_join_coupon_alter().
+ *
+ * A gift card code typed on the join form becomes a Chargebee coupon for the
+ * card's balance (or the Jumpstart's free months).
+ */
+function makerspace_landing_page_chargebee_portal_join_coupon_alter(string &$code, array &$context) {
+  $result = \Drupal::service('makerspace_landing_page.gift_card_redeemer')->resolveJoinCode($code);
+  if (empty($result['matched'])) {
+    return;
+  }
+  if (!empty($result['error'])) {
+    $context['error'] = $result['error'];
+    return;
+  }
+  $code = $result['coupon'];
+  // Chargebee knows the coupon: no need to ask it again.
+  $context['verified'] = TRUE;
+}
+
+/**
+ * Implements hook_mail().
+ */
+function makerspace_landing_page_mail($key, &$message, $params) {
+  if ($key !== 'gift_card_recipient') {
+    return;
+  }
+  $card = $params['card'];
+  $from = trim((string) $card->buyer_name) ?: t('Someone');
+  $amount = \Drupal\makerspace_landing_page\GiftCard\GiftCardMath::dollars((int) $card->balance_cents);
+  $value = match ($card->kind) {
+    'jumpstart' => t('the MakeHaven Jumpstart: GEMS, our 10-week guided introduction to the shop, plus 3 months of membership'),
+    'workshop' => t('@amount toward MakeHaven classes', ['@amount' => $amount]),
+    'membership' => t('@amount toward a MakeHaven membership', ['@amount' => $amount]),
+    default => t('@amount of credit at MakeHaven', ['@amount' => $amount]),
+  };
+  $first = strtok(trim((string) $card->recipient_name), ' ');
+
+  $message['subject'] = t('@from sent you a MakeHaven gift card', ['@from' => $from]);
+  $lines = [];
+  $lines[] = t('Hi @name,', ['@name' => $first ?: t('there')]);
+  $lines[] = '';
+  $lines[] = t('@from sent you @value. MakeHaven is a community makerspace in downtown New Haven, with wood, metal, textiles, laser cutting, 3D printing and electronics, and people who will show you how.', ['@from' => $from, '@value' => $value]);
+  if ($card->contribution_id) {
+    $message_text = _makerspace_landing_page_gift_card_message((int) $card->contribution_id);
+    if ($message_text !== '') {
+      $lines[] = '';
+      $lines[] = t('Their message:');
+      $lines[] = $message_text;
+    }
+  }
+  $lines[] = '';
+  $lines[] = t('Your code: @code', ['@code' => $card->display_code]);
+  $lines[] = \Drupal\makerspace_landing_page\GiftCard\GiftCardDelivery::howToRedeem($card);
+  if (!empty($params['print_url'])) {
+    $lines[] = '';
+    $lines[] = t('See or print your card: @url', ['@url' => $params['print_url']]);
+  }
+  $lines[] = '';
+  $lines[] = t('Gift cards never expire. Questions: info@makehaven.org');
+  $lines[] = '';
+  $lines[] = t('MakeHaven');
+  $message['body'] = array_map('strval', $lines);
+}
+
+/**
+ * The buyer's card message on a gift card order, or ''.
+ */
+function _makerspace_landing_page_gift_card_message(int $contribution_id): string {
+  \Drupal::service('civicrm')->initialize();
+  $row = \Civi\Api4\Contribution::get(FALSE)->addSelect('Gift_Card.Card_Message')
+    ->addWhere('id', '=', $contribution_id)->execute()->first();
+  return trim((string) ($row['Gift_Card.Card_Message'] ?? ''));
+}

@@ -23,7 +23,10 @@ final class GiftCardDesigns {
   public static function forPage(?string $page_name, float $amount): array {
     $designs = self::designs();
     if ($page_name !== NULL && isset($designs[$page_name])) {
-      return $designs[$page_name];
+      $design = $designs[$page_name];
+      $value = '$' . number_format($amount, $amount == floor($amount) ? 0 : 2);
+      $design['items'] = array_map(static fn(string $item) => str_replace('@amount', $value, $item), $design['items']);
+      return $design;
     }
     return [
       'headline' => 'A gift of making.',
@@ -34,7 +37,7 @@ final class GiftCardDesigns {
         'A 24/7 community workspace with wood, metal, textiles, laser, 3D printing and electronics',
       ],
       'footnote' => '',
-      'redeem' => 'Email info@makehaven.org with your code, and we\'ll apply it to your account.',
+      'redeem' => 'Use it at makehaven.org/redeem: enter your code when you join, or add it to your membership if you\'re already a member.',
     ];
   }
 
@@ -53,7 +56,29 @@ final class GiftCardDesigns {
           '<b>Materials</b> for the class projects',
         ],
         'footnote' => 'intro · digital fab · wood · metal · textiles · graduation',
-        'redeem' => 'Email info@makehaven.org with your code, or visit makehaven.org/jumpstart. Pick a GEMS cohort and your 3 months of membership begin with it.',
+        'redeem' => 'Join at makehaven.org/redeem with your code: your 3 months of membership are free. Then email info@makehaven.org to pick your GEMS cohort.',
+      ],
+      'membership_gift_card' => [
+        'headline' => 'A gift of making.',
+        'inside_title' => 'What\'s inside',
+        'items' => [
+          '<b>@amount</b> toward MakeHaven membership',
+          '24/7 access to a community workshop: wood, metal, textiles, laser, 3D printing and electronics',
+          'Badge classes, member events, and people who will show you how',
+        ],
+        'footnote' => 'Never expires · use it toward any membership plan',
+        'redeem' => 'Use it at makehaven.org/redeem: new members enter the code when they join; current members add it to their account in one step.',
+      ],
+      'workshop_gift_card' => [
+        'headline' => 'Learn something new.',
+        'inside_title' => 'What\'s inside',
+        'items' => [
+          '<b>@amount</b> toward MakeHaven classes',
+          'Woodworking, welding, sewing, laser cutting, electronics and more',
+          'Small, hands-on classes taught by local makers',
+        ],
+        'footnote' => 'Never expires · whatever isn\'t spent stays on the card',
+        'redeem' => 'Pick a class at makehaven.org/events and enter your code in the discount code box when you register.',
       ],
     ];
   }

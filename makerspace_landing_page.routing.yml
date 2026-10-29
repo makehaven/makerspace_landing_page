@@ -10,3 +10,38 @@ makerspace_landing_page.gift_card_print:
     contribution_id: '\d+'
   options:
     no_cache: TRUE
+
+makerspace_landing_page.gift_card_redeem:
+  path: '/gift-card/redeem'
+  defaults:
+    _form: '\Drupal\makerspace_landing_page\Form\GiftCardRedeemForm'
+    _title: 'Use a MakeHaven gift card'
+  requirements:
+    _access: 'TRUE'
+  options:
+    no_cache: TRUE
+
+makerspace_landing_page.gift_card_admin:
+  path: '/admin/gift-cards'
+  defaults:
+    _controller: '\Drupal\makerspace_landing_page\Controller\GiftCardAdminController::list'
+    _title: 'Gift cards'
+  requirements:
+    _permission: 'access CiviContribute'
+
+makerspace_landing_page.gift_card_report:
+  path: '/admin/gift-cards/report'
+  defaults:
+    _controller: '\Drupal\makerspace_landing_page\Controller\GiftCardAdminController::report'
+    _title: 'Gift cards: monthly report'
+  requirements:
+    _permission: 'access CiviContribute'
+
+makerspace_landing_page.gift_card_admin_card:
+  path: '/admin/gift-cards/{card_id}'
+  defaults:
+    _form: '\Drupal\makerspace_landing_page\Form\GiftCardAdminCardForm'
+    _title_callback: '\Drupal\makerspace_landing_page\Form\GiftCardAdminCardForm::title'
+  requirements:
+    _permission: 'access CiviContribute'
+    card_id: '\d+'
