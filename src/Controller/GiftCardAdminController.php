@@ -29,6 +29,7 @@ class GiftCardAdminController extends ControllerBase {
     'manual' => 'Added by staff',
     'legacy' => 'Imported from before the ledger',
     'system' => 'Automatic',
+    'bonus' => 'Multi-month savings',
   ];
 
   public function __construct(
@@ -139,6 +140,9 @@ class GiftCardAdminController extends ControllerBase {
     }
     foreach ($r['redeemed'] as $channel => $cents) {
       $lines[] = ['Redeemed: ' . (self::CHANNEL_LABELS[$channel] ?? $channel), GiftCardMath::dollars($cents)];
+    }
+    if ($r['bonus']) {
+      $lines[] = ['Bonus value on 6- and 12-month cards (a discount, not money received)', GiftCardMath::dollars($r['bonus'])];
     }
     if ($r['adjusted']) {
       $lines[] = ['Staff corrections and voids', GiftCardMath::dollars($r['adjusted'])];

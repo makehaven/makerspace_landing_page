@@ -84,6 +84,16 @@ class GiftCardMathTest extends UnitTestCase {
   /**
    * Dollars without needless cents.
    */
+  public function testPresetBonus(): void {
+    $line = static fn(string $page, string $option, $qty = 1) => ['page' => $page, 'option' => $option, 'qty' => $qty];
+    $this->assertSame(2500, GiftCardMath::presetBonus([$line('membership_gift_card', 'six_months')]));
+    $this->assertSame(10000, GiftCardMath::presetBonus([$line('membership_gift_card', 'twelve_months', '2.00')]));
+    $this->assertSame(0, GiftCardMath::presetBonus([$line('membership_gift_card', 'three_months')]));
+    $this->assertSame(0, GiftCardMath::presetBonus([$line('membership_gift_card', 'other_amount')]));
+    $this->assertSame(0, GiftCardMath::presetBonus([$line('workshop_gift_card', 'six_months')]));
+    $this->assertSame(0, GiftCardMath::presetBonus([]));
+  }
+
   public function testDollars(): void {
     $this->assertSame('$186', GiftCardMath::dollars(18600));
     $this->assertSame('$25.50', GiftCardMath::dollars(2550));

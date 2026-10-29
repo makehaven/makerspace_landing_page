@@ -9,6 +9,7 @@ use Drupal\Core\Extension\ModuleExtensionList;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\makerspace_landing_page\GiftCard\GiftCardCode;
 use Drupal\makerspace_landing_page\GiftCard\GiftCardDesigns;
+use Drupal\makerspace_landing_page\GiftCard\GiftCardLedger;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -27,6 +28,7 @@ class GiftCardController extends ControllerBase {
     protected Civicrm $civicrm,
     protected RendererInterface $renderer,
     protected ModuleExtensionList $moduleList,
+    protected GiftCardLedger $ledger,
   ) {}
 
   /**
@@ -37,6 +39,7 @@ class GiftCardController extends ControllerBase {
       $container->get('civicrm'),
       $container->get('renderer'),
       $container->get('extension.list.module'),
+      $container->get('makerspace_landing_page.gift_card_ledger'),
     );
   }
 
@@ -74,10 +77,14 @@ class GiftCardController extends ControllerBase {
     $is_gift = ($c['Gift_Card.Gift_For'] ?? 'gift') !== 'self';
     $recipient = trim((string) ($c['Gift_Card.Recipient_Name'] ?? ''));
 
+    // The card's face value: a 6- or 12-month card is worth more than it cost.
+    $card = $this->ledger->findByContribution((int) $c['id']);
+    $value = $card ? ((int) $card->amount_cents) / 100 : (float) $c['total_amount'];
+
     $base = base_path() . $this->moduleList->getPath('makerspace_landing_page');
     $build = [
       '#theme' => 'makerspace_gift_card',
-      '#design' => GiftCardDesigns::forPage($c['contribution_page_id.name'] ?? NULL, (float) $c['total_amount']),
+      '#design' => GiftCardDesigns::forPage($c['contribution_page_id.name'] ?? NULL, $value),
       '#to' => $is_gift ? ($recipient !== '' ? $recipient : 'you') : $buyer,
       '#from' => $is_gift ? $buyer : '',
       '#message' => trim((string) ($c['Gift_Card.Card_Message'] ?? '')),
