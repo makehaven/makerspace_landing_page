@@ -1,6 +1,6 @@
 name: 'Makerspace Landing Page'
 type: module
-description: 'Enhances Landing Page content type with robust tracking, coupons, and styling; prints fold-up gift cards for CiviCRM Gift Card orders.'
+description: 'Enhances Landing Page content type with robust tracking, coupons, and styling. Gift cards: prints fold-up cards for CiviCRM Gift Card orders, keeps a balance ledger (/admin/gift-cards), and redeems cards as Chargebee credit or class discount codes.'
 core_version_requirement: ^10 || ^11
 package: Makerspace
 dependencies:

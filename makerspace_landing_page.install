@@ -1,0 +1,138 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for Makerspace Landing Page.
+ */
+
+/**
+ * Implements hook_schema().
+ *
+ * The gift card ledger: one row per card, one row per change to its balance.
+ * A card's balance is always the sum of its transactions; the balance column
+ * is a cached copy so lists and lookups don't add up history every time.
+ */
+function makerspace_landing_page_schema() {
+  $schema['makerspace_gift_card'] = [
+    'description' => 'Gift cards: what was sold, to whom, and what is left on each.',
+    'fields' => [
+      'id' => ['type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE],
+      'code' => [
+        'type' => 'varchar', 'length' => 32, 'not null' => TRUE,
+        'description' => 'Normalized code: upper case, letters and digits only.',
+      ],
+      'display_code' => [
+        'type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => '',
+        'description' => 'The code as printed on the card.',
+      ],
+      'kind' => [
+        'type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => 'credit',
+        'description' => 'membership, workshop, jumpstart, credit (any service) or legacy.',
+      ],
+      'source' => [
+        'type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => 'civicrm',
+        'description' => 'Where the card came from: civicrm (an order), manual, or a legacy import.',
+      ],
+      'contribution_id' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE],
+      'contact_id' => [
+        'type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE,
+        'description' => 'The buyer (CiviCRM contact).',
+      ],
+      'buyer_name' => ['type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''],
+      'buyer_email' => ['type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''],
+      'recipient_name' => ['type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''],
+      'recipient_email' => ['type' => 'varchar', 'length' => 255, 'not null' => TRUE, 'default' => ''],
+      'delivery' => [
+        'type' => 'varchar', 'length' => 16, 'not null' => TRUE, 'default' => 'email',
+        'description' => 'email (buyer prints or forwards), recipient (we email the recipient) or mail.',
+      ],
+      'deliver_after' => [
+        'type' => 'int', 'not null' => FALSE,
+        'description' => 'Do not contact the recipient before this timestamp.',
+      ],
+      'paid_cents' => [
+        'type' => 'int', 'not null' => TRUE, 'default' => 0,
+        'description' => 'What the buyer paid; the liability booked at sale.',
+      ],
+      'amount_cents' => [
+        'type' => 'int', 'not null' => TRUE, 'default' => 0,
+        'description' => 'Face value: what the card is worth when issued.',
+      ],
+      'balance_cents' => ['type' => 'int', 'not null' => TRUE, 'default' => 0],
+      'status' => [
+        'type' => 'varchar', 'length' => 16, 'not null' => TRUE, 'default' => 'active',
+        'description' => 'active, used (balance spent) or void.',
+      ],
+      'discount_id' => [
+        'type' => 'int', 'unsigned' => TRUE, 'not null' => FALSE,
+        'description' => 'CiviDiscount item that redeems a workshop card at event registration.',
+      ],
+      'recipient_emailed' => ['type' => 'int', 'not null' => FALSE],
+      'mailed' => ['type' => 'int', 'not null' => FALSE],
+      'created' => ['type' => 'int', 'not null' => TRUE, 'default' => 0],
+      'changed' => ['type' => 'int', 'not null' => TRUE, 'default' => 0],
+      'note' => ['type' => 'text', 'size' => 'normal', 'not null' => FALSE],
+    ],
+    'primary key' => ['id'],
+    'unique keys' => [
+      'code' => ['code'],
+      'contribution_id' => ['contribution_id'],
+    ],
+    'indexes' => [
+      'status' => ['status'],
+      'recipient_email' => ['recipient_email'],
+      'buyer_email' => ['buyer_email'],
+    ],
+  ];
+
+  $schema['makerspace_gift_card_txn'] = [
+    'description' => 'Every change to a gift card balance.',
+    'fields' => [
+      'id' => ['type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE],
+      'card_id' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE],
+      'type' => [
+        'type' => 'varchar', 'length' => 16, 'not null' => TRUE,
+        'description' => 'issue, redeem, adjust, void or note.',
+      ],
+      'amount_cents' => [
+        'type' => 'int', 'not null' => TRUE, 'default' => 0,
+        'description' => 'Signed change to the balance: issue is positive, redeem negative.',
+      ],
+      'channel' => [
+        'type' => 'varchar', 'length' => 32, 'not null' => TRUE, 'default' => 'staff',
+        'description' => 'Where value went: chargebee_coupon, chargebee_credit, event_discount, staff.',
+      ],
+      'reference' => [
+        'type' => 'varchar', 'length' => 128, 'not null' => TRUE, 'default' => '',
+        'description' => 'Invoice, subscription or contribution the change belongs to; makes retries idempotent.',
+      ],
+      'uid' => ['type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE, 'default' => 0],
+      'created' => ['type' => 'int', 'not null' => TRUE, 'default' => 0],
+      'note' => ['type' => 'varchar', 'length' => 512, 'not null' => TRUE, 'default' => ''],
+    ],
+    'primary key' => ['id'],
+    'indexes' => [
+      'card' => ['card_id'],
+      'created' => ['created'],
+      'reference' => ['card_id', 'channel', 'reference'],
+    ],
+  ];
+
+  return $schema;
+}
+
+/**
+ * Create the gift card ledger tables.
+ */
+function makerspace_landing_page_update_10001() {
+  $schema = \Drupal::database()->schema();
+  $tables = makerspace_landing_page_schema();
+  $created = [];
+  foreach ($tables as $name => $spec) {
+    if (!$schema->tableExists($name)) {
+      $schema->createTable($name, $spec);
+      $created[] = $name;
+    }
+  }
+  return $created ? 'Created ' . implode(', ', $created) . '.' : 'Gift card tables already exist.';
+}
