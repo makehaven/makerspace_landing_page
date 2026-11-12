@@ -158,6 +158,13 @@ function makerspace_landing_page_theme() {
  * is obvious where the card goes (Ashley, 2026-10-26).
  */
 function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
+  if ($formName === 'CRM_Event_Form_Registration_Register' && $form->elementExists('discountcode')) {
+    // Gift card codes are printed "7F3A-92C1"; CiviDiscount wants that exact
+    // spelling, so "7f3a 92c1" or "7F3A92C1" would be refused. Put the dash
+    // back for anything shaped like a card code (no other code is).
+    \Civi::resources()->addScript('CRM.$(function($) { $("#discountcode").on("change blur", function() { var m = /^\\s*([0-9a-f]{4})[\\s._-]*([0-9a-f]{4})\\s*$/i.exec(this.value); if (m) { this.value = (m[1] + "-" + m[2]).toUpperCase(); } }); $("#discountcode").closest("form").on("submit", function() { $("#discountcode").trigger("change"); }); });');
+    return;
+  }
   if (!in_array($formName, ['CRM_Contribute_Form_Contribution_Main', 'CRM_Contribute_Form_Contribution_Confirm'], TRUE)) {
     return;
   }
@@ -189,6 +196,11 @@ function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
       #crm-payment-js-billing-form-container .mh-card-heading { font-weight: 600; margin: 0 0 8px; }
     ');
     \Civi::resources()->addScript('CRM.$(function($) { $("#crm-payment-js-billing-form-container").prepend($("<p class=\"mh-card-heading\"></p>").text(' . $heading . ')); });');
+    // No mailed Jumpstart cards: mailing is a staff step (JR 2026-11-12).
+    // The ledger also treats a "mail" choice on a Jumpstart as email.
+    if (($form->_values['name'] ?? '') === 'jumpstart_gift') {
+      \Civi::resources()->addScript('CRM.$(function($) { $("input[type=radio][value=mail]").each(function() { $("label[for=\'" + this.id + "\']").hide(); $(this).hide(); }); });');
+    }
   }
 }
 

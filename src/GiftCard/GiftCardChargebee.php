@@ -85,10 +85,13 @@ class GiftCardChargebee {
     if ($customer_id === '' || $amount_cents <= 0) {
       throw new \RuntimeException('Refusing to add credit without a customer or a positive amount.');
     }
-    $response = $this->request('POST', 'customers/' . rawurlencode($customer_id) . '/add_promotional_credit', [
+    // promotional_credits/add: this account answers the older
+    // customers/{id}/add_promotional_credit with 404 "not found" (checked on
+    // the test site 2026-11-12; a live referral credit failed the same way).
+    $response = $this->request('POST', 'promotional_credits/add', [
+      'customer_id' => $customer_id,
       'amount' => $amount_cents,
       'description' => mb_substr($description, 0, 250),
-      'credit_type' => 'promotional_credits',
     ]);
     $this->assertOk($response, 'add promotional credit');
   }

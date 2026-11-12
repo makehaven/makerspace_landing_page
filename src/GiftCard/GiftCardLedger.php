@@ -113,7 +113,9 @@ class GiftCardLedger {
       'buyer_email' => (string) ($c['contact_id.email_primary.email'] ?? ''),
       'recipient_name' => $is_gift ? trim((string) ($c['Gift_Card.Recipient_Name'] ?? '')) : '',
       'recipient_email' => $is_gift ? trim((string) ($c['Gift_Card.Recipient_Email'] ?? '')) : '',
-      'delivery' => in_array($delivery, ['email', 'recipient', 'mail'], TRUE) ? $delivery : 'email',
+      // A Jumpstart is never mailed by hand: the receipt's print button and
+      // the recipient email cover it (JR 2026-11-12).
+      'delivery' => in_array($delivery, ['email', 'recipient', 'mail'], TRUE) && !($kind === 'jumpstart' && $delivery === 'mail') ? $delivery : 'email',
       'deliver_after' => $after ?: NULL,
       'paid_cents' => $cents,
       'amount_cents' => $cents + $bonus,
@@ -276,6 +278,16 @@ class GiftCardLedger {
     return (bool) $this->db->select(self::TXN, 't')->fields('t', ['id'])
       ->condition('card_id', $card_id)->condition('type', $type)
       ->condition('channel', $channel)->condition('reference', $reference)
+      ->range(0, 1)->execute()->fetchField();
+  }
+
+  /**
+   * Whether a card has any change of this type on one of these channels.
+   */
+  public function hasChannelTxn(int $card_id, string $type, array $channels): bool {
+    return (bool) $this->db->select(self::TXN, 't')->fields('t', ['id'])
+      ->condition('card_id', $card_id)->condition('type', $type)
+      ->condition('channel', $channels, 'IN')
       ->range(0, 1)->execute()->fetchField();
   }
 
