@@ -27,6 +27,15 @@ class GiftCardEventCodes {
    */
   public const EVENT_FILTER = '{"Event":{"event_type_id":{"IN":["6","16","7"]}}}';
 
+  /**
+   * GEMS cohorts only: a Program event with GEMS in its title.
+   *
+   * Program (7) alone also covers Foundations of Fabrication, Pathway to
+   * Trades and others; "GEMS" alone catches workshops like "Gems & Jewels".
+   * Both together match every cohort, including ones added later.
+   */
+  public const GEMS_FILTER = '{"Event":{"event_type_id":{"IN":["7"]},"title":{"LIKE":"%GEMS%"}}}';
+
   public function __construct(
     protected GiftCardLedger $ledger,
     protected Civicrm $civicrm,
@@ -37,7 +46,14 @@ class GiftCardEventCodes {
    * Whether a kind of card can pay for classes.
    */
   public static function appliesTo(string $kind): bool {
-    return in_array($kind, ['workshop', 'credit'], TRUE);
+    return in_array($kind, ['workshop', 'credit', 'jumpstart'], TRUE);
+  }
+
+  /**
+   * Which events a kind of card's code works on.
+   */
+  public static function filterFor(string $kind): string {
+    return $kind === 'jumpstart' ? self::GEMS_FILTER : self::EVENT_FILTER;
   }
 
   /**
@@ -56,13 +72,13 @@ class GiftCardEventCodes {
          VALUES (%1, %2, %3, %4, 1, 0, 0, %5, %5, %5, %6, 1, 0, %5, %7, %8)',
         [
           1 => [$card->display_code, 'String'],
-          2 => [mb_substr('Gift card ' . $card->display_code . ($who !== '' ? ' (' . $who . ')' : '') . ', managed by the gift card ledger', 0, 255), 'String'],
+          2 => [mb_substr(($card->kind === 'jumpstart' ? 'Jumpstart GEMS seat ' : 'Gift card ') . $card->display_code . ($who !== '' ? ' (' . $who . ')' : '') . ', managed by the gift card ledger', 0, 255), 'String'],
           3 => [self::amount((int) $card->balance_cents), 'String'],
           4 => ['2', 'String'],
           5 => ['', 'String'],
           6 => ['[]', 'String'],
-          7 => [self::EVENT_FILTER, 'String'],
-          8 => ['Gift card', 'String'],
+          7 => [self::filterFor((string) $card->kind), 'String'],
+          8 => [$card->kind === 'jumpstart' ? 'Jumpstart' : 'Gift card', 'String'],
         ]
       );
       $id = \CRM_Core_DAO::singleValueQuery('SELECT LAST_INSERT_ID()');
@@ -93,7 +109,13 @@ class GiftCardEventCodes {
         $card = $this->ledger->load((int) $card->id);
         $take = min($applied, max(0, (int) $card->balance_cents));
         $note = 'Class registration, order ' . $uses->contribution_id;
-        if ($applied > $take) {
+        if ($card->kind === 'jumpstart') {
+          // The Jumpstart's value is one GEMS seat: one registration uses it
+          // up, whatever the cohort's price that day.
+          $take = max(0, (int) $card->balance_cents);
+          $note = 'GEMS registration, order ' . $uses->contribution_id;
+        }
+        elseif ($applied > $take) {
           // Several tickets in one order can each get the full discount.
           $note .= sprintf('. Took %s off but only %s was left: %s over.', GiftCardMath::dollars($applied), GiftCardMath::dollars($take), GiftCardMath::dollars($applied - $take));
           $this->loggerFactory->get('makerspace_landing_page')->warning('Gift card @code: @note', ['@code' => $card->display_code, '@note' => $note]);

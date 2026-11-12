@@ -111,10 +111,32 @@ class GiftCardRedeemForm extends FormBase {
     $is_member = $user && $user->hasField('field_user_chargebee_id') && trim((string) $user->get('field_user_chargebee_id')->value) !== '';
 
     if ($card->kind === 'jumpstart') {
+      // Two parts, each used on its own, in either order.
+      $steps = [];
+      $steps[] = $this->redeemer->jumpstartSeatUsed($card)
+        ? $this->t('<strong>GEMS:</strong> done, the seat was used for a cohort registration.')
+        : $this->t('<strong>GEMS:</strong> pick a cohort at <a href=":gems">makehaven.org/gems</a> and register. Enter <strong>@code</strong> in the discount code box and the $285 comes off.', [':gems' => '/gems', '@code' => $card->display_code]);
+      if ($this->redeemer->jumpstartMonthsUsed($card)) {
+        $steps[] = $this->t('<strong>3 months of membership:</strong> done, already on a membership.');
+      }
+      elseif ($is_member) {
+        $steps[] = $this->t('<strong>3 months of membership:</strong> you are already a member, so they go on your account as @amount of credit that pays your next invoices.', ['@amount' => GiftCardMath::dollars(GiftCardMath::JUMPSTART_MEMBER_CREDIT_CENTS)]);
+        $form['result']['apply'] = [
+          '#type' => 'submit',
+          '#value' => $this->t('Add 3 months to my membership'),
+          '#name' => 'apply',
+          '#button_type' => 'primary',
+          '#weight' => 10,
+        ];
+      }
+      else {
+        $login = Url::fromRoute('user.login', [], ['query' => ['destination' => Url::fromRoute('<current>', [], ['query' => ['code' => $card->display_code]])->toString()]])->toString();
+        $steps[] = $this->t('<strong>3 months of membership:</strong> <a href=":join">join MakeHaven with this code</a> and your first 3 months are free. Already a member? <a href=":login">Log in</a> first.', [':join' => $join, ':login' => $login]);
+      }
       $form['result']['how'] = [
-        '#markup' => '<p>' . ($is_member
-          ? $this->t('You already have a membership, so staff will set up your Jumpstart with you. Email info@makehaven.org with the code @code.', ['@code' => $card->display_code])
-          : $this->t('<a href=":join">Join MakeHaven with this code</a>: your first 3 months of membership are free. Then email info@makehaven.org to pick your GEMS cohort.', [':join' => $join])) . '</p>',
+        '#theme' => 'item_list',
+        '#list_type' => 'ol',
+        '#items' => $steps,
       ];
       return $form;
     }

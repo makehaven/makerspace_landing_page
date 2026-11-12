@@ -48,6 +48,12 @@ class GiftCardRedeemer {
     if ($error = $this->unusableReason($card)) {
       return ['matched' => TRUE, 'error' => $error];
     }
+    if ($card->kind === 'jumpstart' && $this->jumpstartMonthsUsed($card)) {
+      return [
+        'matched' => TRUE,
+        'error' => (string) $this->t('The 3 months of membership on @code have already been used. Its GEMS seat still works: pick a cohort at makehaven.org/gems and enter @code in the discount code box when you register. To join now, clear the code and continue.', ['@code' => $card->display_code]),
+      ];
+    }
     if ($card->kind === 'workshop') {
       return [
         'matched' => TRUE,
@@ -77,7 +83,7 @@ class GiftCardRedeemer {
       ]);
       return [
         'matched' => TRUE,
-        'error' => (string) $this->t("We couldn't apply your gift card just now. Clear the code and continue joining, then email info@makehaven.org with the code @code and we'll add it to your account.", ['@code' => $card->display_code]),
+        'error' => (string) $this->t("We couldn't reach our billing system to apply @code. Please try again in a few minutes. If it still doesn't work, email info@makehaven.org with the code.", ['@code' => $card->display_code]),
       ];
     }
     if (($coupon['status'] ?? 'active') !== 'active') {
@@ -107,12 +113,12 @@ class GiftCardRedeemer {
     if ($card->kind === 'workshop') {
       throw new \RuntimeException((string) $this->t('This is a workshop gift card. Enter @code in the discount code box when you register for a class.', ['@code' => $card->display_code]));
     }
-    if ($card->kind === 'jumpstart') {
-      throw new \RuntimeException((string) $this->t('Jumpstart cards include a GEMS seat, so staff set them up with you. Email info@makehaven.org with the code @code.', ['@code' => $card->display_code]));
-    }
     $customer = $account->hasField('field_user_chargebee_id') ? trim((string) $account->get('field_user_chargebee_id')->value) : '';
     if ($customer === '') {
       throw new \RuntimeException((string) $this->t("Your account isn't linked to a membership yet. If you're joining, enter the code on the join form instead."));
+    }
+    if ($card->kind === 'jumpstart') {
+      return $this->redeemJumpstartMonthsForMember($card, $account, $customer);
     }
     $amount = (int) $card->balance_cents;
     $reference = 'member:' . $account->id();
@@ -130,6 +136,46 @@ class GiftCardRedeemer {
       throw new \RuntimeException((string) $this->t("We couldn't reach the billing system. Your gift card wasn't used; please try again later or email info@makehaven.org."));
     }
     return (string) $this->t('@amount of membership credit is now on your account. It pays your next invoices automatically.', ['@amount' => GiftCardMath::dollars($amount)]);
+  }
+
+  /**
+   * Puts a Jumpstart's 3 months on a current member's account as credit.
+   *
+   * The card's balance is its GEMS seat, which stays on the card for the
+   * cohort registration; the months are recorded as a zero-amount note, the
+   * same way a new member's free months are.
+   */
+  protected function redeemJumpstartMonthsForMember(object $card, UserInterface $account, string $customer): string {
+    if ($this->jumpstartMonthsUsed($card)) {
+      throw new \RuntimeException((string) $this->t('The 3 months of membership on this Jumpstart have already been used.'));
+    }
+    $credit = GiftCardMath::JUMPSTART_MEMBER_CREDIT_CENTS;
+    $reference = 'member:' . $account->id();
+    if (!$this->ledger->record((int) $card->id, 'note', 0, 'chargebee_credit', $reference, GiftCardMath::JUMPSTART_MONTHS . ' months (' . GiftCardMath::dollars($credit) . ') added as credit for ' . $account->getAccountName() . ' (' . $customer . ')')) {
+      throw new \RuntimeException((string) $this->t('The 3 months of membership on this Jumpstart have already been used.'));
+    }
+    try {
+      $this->chargebee->addCredit($customer, $credit, 'Jumpstart ' . $card->display_code . ': ' . GiftCardMath::JUMPSTART_MONTHS . ' months of membership');
+    }
+    catch (\RuntimeException $e) {
+      $this->ledger->revert((int) $card->id, 'note', 'chargebee_credit', $reference);
+      throw new \RuntimeException((string) $this->t("We couldn't reach the billing system. Nothing was used; please try again in a few minutes."));
+    }
+    return (string) $this->t('@amount of membership credit (3 months) is now on your account. It pays your next invoices automatically.', ['@amount' => GiftCardMath::dollars($credit)]);
+  }
+
+  /**
+   * Whether a Jumpstart's 3 months have been used (joined, or credited).
+   */
+  public function jumpstartMonthsUsed(object $card): bool {
+    return $this->ledger->hasChannelTxn((int) $card->id, 'note', ['chargebee_coupon', 'chargebee_credit']);
+  }
+
+  /**
+   * Whether a Jumpstart's GEMS seat has been used at a registration.
+   */
+  public function jumpstartSeatUsed(object $card): bool {
+    return (int) $card->balance_cents <= 0;
   }
 
   /**
@@ -160,7 +206,7 @@ class GiftCardRedeemer {
       // The free months are the promotion; the card's value is the GEMS seat,
       // which staff record when they register the member for a cohort.
       $this->ledger->record((int) $card->id, 'note', 0, 'chargebee_coupon', $reference,
-        GiftCardMath::JUMPSTART_MONTHS . ' free months started for Chargebee customer ' . $customer_id . '. GEMS seat still to book.');
+        GiftCardMath::JUMPSTART_MONTHS . ' free months started for Chargebee customer ' . $customer_id . '.' . ($this->jumpstartSeatUsed($card) ? '' : ' GEMS seat not used yet.'));
       return TRUE;
     }
 
@@ -199,7 +245,7 @@ class GiftCardRedeemer {
     if ($card->kind !== 'jumpstart' && (int) $card->balance_cents <= 0) {
       return (string) $this->t('Gift card @code has already been used. Questions: info@makehaven.org', ['@code' => $card->display_code]);
     }
-    if ($card->kind === 'jumpstart' && $card->status === 'used') {
+    if ($card->kind === 'jumpstart' && $this->jumpstartSeatUsed($card) && $this->jumpstartMonthsUsed($card)) {
       return (string) $this->t('Gift card @code has already been used. Questions: info@makehaven.org', ['@code' => $card->display_code]);
     }
     return '';

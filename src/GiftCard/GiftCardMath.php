@@ -20,6 +20,15 @@ final class GiftCardMath {
   public const JUMPSTART_MONTHS = 3;
 
   /**
+   * Credit a current member gets instead of the Jumpstart's free months.
+   *
+   * A current member can't start a new subscription with the 3-months-free
+   * coupon, so the months go on their account as credit: 3 x $62 standard
+   * dues (JR 2026-11-12: no Jumpstart step may need staff).
+   */
+  public const JUMPSTART_MEMBER_CREDIT_CENTS = 18600;
+
+  /**
    * Which kind of card each order page sells.
    *
    * Membership cards are credit toward dues (Chargebee), workshop cards credit
