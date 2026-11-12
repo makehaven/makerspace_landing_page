@@ -20,11 +20,12 @@ final class GiftCardMath {
   public const JUMPSTART_MONTHS = 3;
 
   /**
-   * Credit a current member gets instead of the Jumpstart's free months.
+   * Credit for the Jumpstart's free months when the person joined recently.
    *
-   * A current member can't start a new subscription with the 3-months-free
-   * coupon, so the months go on their account as credit: 3 x $62 standard
-   * dues (JR 2026-11-12: no Jumpstart step may need staff).
+   * Someone who joined in the last 30 days can't use the join form's
+   * 3-months-free coupon any more, so the months go on their account as
+   * credit: 3 x $62 standard dues. Longer-standing members don't get the
+   * months at all (JR 2026-11-12: a recruitment offer, no staff step).
    */
   public const JUMPSTART_MEMBER_CREDIT_CENTS = 18600;
 

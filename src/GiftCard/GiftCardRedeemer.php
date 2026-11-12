@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Drupal\makerspace_landing_page\GiftCard;
 
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\user\UserInterface;
 
@@ -30,7 +32,46 @@ class GiftCardRedeemer {
     protected GiftCardLedger $ledger,
     protected GiftCardChargebee $chargebee,
     protected LoggerChannelFactoryInterface $loggerFactory,
+    protected EntityTypeManagerInterface $entityTypeManager,
+    protected AccountProxyInterface $currentUser,
   ) {}
+
+  /**
+   * Days after joining that a member still counts as new for a Jumpstart.
+   */
+  public const JUMPSTART_NEW_MEMBER_DAYS = 30;
+
+  /**
+   * Whether this person may have a Jumpstart's 3 free months.
+   *
+   * The Jumpstart is a recruitment offer (JR 2026-11-12): the free months are
+   * for people joining, including former members coming back, and for anyone
+   * who joined (or rejoined) in the last 30 days, say someone who bought it
+   * for themselves the week they joined. A longer-standing member still gets
+   * the GEMS seat.
+   */
+  public function jumpstartMonthsAllowed(?UserInterface $user): bool {
+    if (!$user || $user->isAnonymous() || !$user->hasRole('member')) {
+      return TRUE;
+    }
+    $profiles = $this->entityTypeManager->getStorage('profile')->loadByProperties(['uid' => $user->id(), 'type' => 'main']);
+    $latest = 0;
+    foreach ($profiles as $profile) {
+      foreach (['field_member_join_date', 'field_member_reactivation_date'] as $field) {
+        if ($profile->hasField($field) && !$profile->get($field)->isEmpty()) {
+          $latest = max($latest, (int) strtotime((string) $profile->get($field)->value));
+        }
+      }
+    }
+    return $latest > 0 && $latest >= strtotime('-' . self::JUMPSTART_NEW_MEMBER_DAYS . ' days');
+  }
+
+  /**
+   * What a member who can't have the free months is told.
+   */
+  protected function newMembersOnlyMessage(object $card): string {
+    return (string) $this->t("The Jumpstart's 3 free months are for new members, and you're already a member. Its GEMS seat still works: pick a cohort at makehaven.org/gems and enter @code in the discount code box when you register.", ['@code' => $card->display_code]);
+  }
 
   /**
    * Resolves a code typed on the join form.
@@ -47,6 +88,9 @@ class GiftCardRedeemer {
     }
     if ($error = $this->unusableReason($card)) {
       return ['matched' => TRUE, 'error' => $error];
+    }
+    if ($card->kind === 'jumpstart' && !$this->jumpstartMonthsAllowed($this->currentUserEntity())) {
+      return ['matched' => TRUE, 'error' => $this->newMembersOnlyMessage($card)];
     }
     if ($card->kind === 'jumpstart' && $this->jumpstartMonthsUsed($card)) {
       return [
@@ -146,6 +190,9 @@ class GiftCardRedeemer {
    * same way a new member's free months are.
    */
   protected function redeemJumpstartMonthsForMember(object $card, UserInterface $account, string $customer): string {
+    if (!$this->jumpstartMonthsAllowed($account)) {
+      throw new \RuntimeException($this->newMembersOnlyMessage($card));
+    }
     if ($this->jumpstartMonthsUsed($card)) {
       throw new \RuntimeException((string) $this->t('The 3 months of membership on this Jumpstart have already been used.'));
     }
@@ -162,6 +209,17 @@ class GiftCardRedeemer {
       throw new \RuntimeException((string) $this->t("We couldn't reach the billing system. Nothing was used; please try again in a few minutes."));
     }
     return (string) $this->t('@amount of membership credit (3 months) is now on your account. It pays your next invoices automatically.', ['@amount' => GiftCardMath::dollars($credit)]);
+  }
+
+  /**
+   * The logged-in user, or NULL.
+   */
+  protected function currentUserEntity(): ?UserInterface {
+    if ($this->currentUser->isAnonymous()) {
+      return NULL;
+    }
+    $user = $this->entityTypeManager->getStorage('user')->load($this->currentUser->id());
+    return $user instanceof UserInterface ? $user : NULL;
   }
 
   /**

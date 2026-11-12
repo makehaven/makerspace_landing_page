@@ -56,7 +56,7 @@ final class GiftCardDesigns {
           '<b>Materials</b> for the class projects',
         ],
         'footnote' => 'intro · digital fab · wood · metal · textiles · graduation',
-        'redeem' => 'One code, two steps, in either order: register for a GEMS cohort at makehaven.org/gems and enter the code at registration; join at makehaven.org/redeem with the same code and your 3 months are free.',
+        'redeem' => 'One code, two steps, in either order: register for a GEMS cohort at makehaven.org/gems and enter the code at registration; join at makehaven.org/redeem with the same code and your 3 months are free (new members).',
       ],
       'membership_gift_card' => [
         'headline' => 'A gift of making.',

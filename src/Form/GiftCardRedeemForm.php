@@ -119,8 +119,11 @@ class GiftCardRedeemForm extends FormBase {
       if ($this->redeemer->jumpstartMonthsUsed($card)) {
         $steps[] = $this->t('<strong>3 months of membership:</strong> done, already on a membership.');
       }
+      elseif ($is_member && !$this->redeemer->jumpstartMonthsAllowed($user)) {
+        $steps[] = $this->t('<strong>3 months of membership:</strong> these are for new members, and you are already a member, so only the GEMS seat applies.');
+      }
       elseif ($is_member) {
-        $steps[] = $this->t('<strong>3 months of membership:</strong> you are already a member, so they go on your account as @amount of credit that pays your next invoices.', ['@amount' => GiftCardMath::dollars(GiftCardMath::JUMPSTART_MEMBER_CREDIT_CENTS)]);
+        $steps[] = $this->t('<strong>3 months of membership:</strong> you joined recently, so they go on your account as @amount of credit that pays your next invoices.', ['@amount' => GiftCardMath::dollars(GiftCardMath::JUMPSTART_MEMBER_CREDIT_CENTS)]);
         $form['result']['apply'] = [
           '#type' => 'submit',
           '#value' => $this->t('Add 3 months to my membership'),
@@ -131,7 +134,7 @@ class GiftCardRedeemForm extends FormBase {
       }
       else {
         $login = Url::fromRoute('user.login', [], ['query' => ['destination' => Url::fromRoute('<current>', [], ['query' => ['code' => $card->display_code]])->toString()]])->toString();
-        $steps[] = $this->t('<strong>3 months of membership:</strong> <a href=":join">join MakeHaven with this code</a> and your first 3 months are free. Already a member? <a href=":login">Log in</a> first.', [':join' => $join, ':login' => $login]);
+        $steps[] = $this->t('<strong>3 months of membership:</strong> <a href=":join">join MakeHaven with this code</a> and your first 3 months are free (new members, including former members coming back). Joined in the last 30 days? <a href=":login">Log in</a> to add them to your account.', [':join' => $join, ':login' => $login]);
       }
       $form['result']['how'] = [
         '#theme' => 'item_list',

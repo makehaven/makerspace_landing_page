@@ -9,7 +9,7 @@ services:
 
   makerspace_landing_page.gift_card_redeemer:
     class: Drupal\makerspace_landing_page\GiftCard\GiftCardRedeemer
-    arguments: ['@makerspace_landing_page.gift_card_ledger', '@makerspace_landing_page.gift_card_chargebee', '@logger.factory']
+    arguments: ['@makerspace_landing_page.gift_card_ledger', '@makerspace_landing_page.gift_card_chargebee', '@logger.factory', '@entity_type.manager', '@current_user']
 
   makerspace_landing_page.gift_card_event_codes:
     class: Drupal\makerspace_landing_page\GiftCard\GiftCardEventCodes

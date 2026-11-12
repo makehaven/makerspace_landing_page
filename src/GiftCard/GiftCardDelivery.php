@@ -95,7 +95,7 @@ class GiftCardDelivery {
     $redeem = Url::fromRoute('makerspace_landing_page.gift_card_redeem', [], ['absolute' => TRUE, 'query' => ['code' => $card->display_code]])->toString();
     return match ($card->kind) {
       'workshop' => "Pick a class at https://www.makehaven.org/events and enter {$card->display_code} in the discount code box when you register. Whatever you don't use stays on the card for the next class.",
-      'jumpstart' => "Your code works twice, in either order. 1) Pick a GEMS cohort at https://www.makehaven.org/gems, register, and enter {$card->display_code} in the discount code box: the \$285 comes off. 2) Join at https://www.makehaven.org/join-makehaven and enter {$card->display_code} as your gift certificate code: your first 3 months are free (already a member? Use $redeem to add them to your account).",
+      'jumpstart' => "Your code works twice, in either order. 1) Pick a GEMS cohort at https://www.makehaven.org/gems, register, and enter {$card->display_code} in the discount code box: the \$285 comes off. 2) Join at https://www.makehaven.org/join-makehaven and enter {$card->display_code} as your gift certificate code: your first 3 months are free. The free months are for new members; if you joined in the last 30 days, use $redeem to add them to your account.",
       default => "To use it, go to $redeem. New members enter the code when they join; current members add it to their account in one step.",
     };
   }
