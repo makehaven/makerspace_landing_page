@@ -24,3 +24,11 @@ services:
     arguments: ['@queue']
     tags:
       - { name: event_subscriber }
+
+  makerspace_landing_page.gift_card_inspector:
+    class: Drupal\makerspace_landing_page\GiftCard\GiftCardInspector
+    arguments: ['@makerspace_landing_page.gift_card_ledger', '@makerspace_landing_page.gift_card_chargebee', '@civicrm', '@datetime.time']
+
+  makerspace_landing_page.gift_card_preflight:
+    class: Drupal\makerspace_landing_page\GiftCard\GiftCardPreflight
+    arguments: ['@makerspace_landing_page.gift_card_ledger', '@makerspace_landing_page.gift_card_chargebee', '@civicrm', '@datetime.time', '@state', '@module_handler', '@makerspace_landing_page.gift_card_inspector']

@@ -107,12 +107,9 @@ class GiftCardEventCodes {
         }
         $applied = GiftCardMath::eventDiscount($this->lines((int) $uses->contribution_id));
         $card = $this->ledger->load((int) $card->id);
-        $take = min($applied, max(0, (int) $card->balance_cents));
+        $take = GiftCardMath::registrationTake((string) $card->kind, $applied, (int) $card->balance_cents);
         $note = 'Class registration, order ' . $uses->contribution_id;
         if ($card->kind === 'jumpstart') {
-          // The Jumpstart's value is one GEMS seat: one registration uses it
-          // up, whatever the cohort's price that day.
-          $take = max(0, (int) $card->balance_cents);
           $note = 'GEMS registration, order ' . $uses->contribution_id;
         }
         elseif ($applied > $take) {
