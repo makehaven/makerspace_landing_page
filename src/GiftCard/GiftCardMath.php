@@ -146,6 +146,18 @@ final class GiftCardMath {
   }
 
   /**
+   * Cents one registration takes off a card's balance.
+   *
+   * A class card loses what the code took off, never more than is left. A
+   * Jumpstart's value is one GEMS seat: one registration uses it up, whatever
+   * the cohort's price that day.
+   */
+  public static function registrationTake(string $kind, int $applied_cents, int $balance_cents): int {
+    $balance_cents = max(0, $balance_cents);
+    return $kind === 'jumpstart' ? $balance_cents : min(max(0, $applied_cents), $balance_cents);
+  }
+
+  /**
    * Cents a CiviDiscount code took off one registration's line items.
    *
    * CiviDiscount lowers each line's price and leaves the price option pointing

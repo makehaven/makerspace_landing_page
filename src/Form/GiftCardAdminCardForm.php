@@ -12,6 +12,7 @@ use Drupal\Core\Url;
 use Drupal\makerspace_landing_page\Controller\GiftCardAdminController;
 use Drupal\makerspace_landing_page\GiftCard\GiftCardDelivery;
 use Drupal\makerspace_landing_page\GiftCard\GiftCardEventCodes;
+use Drupal\makerspace_landing_page\GiftCard\GiftCardInspector;
 use Drupal\makerspace_landing_page\GiftCard\GiftCardLedger;
 use Drupal\makerspace_landing_page\GiftCard\GiftCardMath;
 use Drupal\makerspace_landing_page\GiftCard\GiftCardRedeemer;
@@ -30,6 +31,7 @@ class GiftCardAdminCardForm extends FormBase {
     protected GiftCardEventCodes $eventCodes,
     protected EntityTypeManagerInterface $entityTypeManager,
     protected TimeInterface $time,
+    protected GiftCardInspector $inspector,
   ) {}
 
   /**
@@ -43,6 +45,7 @@ class GiftCardAdminCardForm extends FormBase {
       $container->get('makerspace_landing_page.gift_card_event_codes'),
       $container->get('entity_type.manager'),
       $container->get('datetime.time'),
+      $container->get('makerspace_landing_page.gift_card_inspector'),
     );
   }
 
@@ -94,6 +97,8 @@ class GiftCardAdminCardForm extends FormBase {
     if ($card->note) {
       $form['note_text'] = ['#markup' => '<p><em>' . nl2br(htmlspecialchars($card->note)) . '</em></p>'];
     }
+
+    $form['standing'] = $this->standing($card);
 
     $links = [];
     if ($print = $this->delivery->printUrl($card)) {
@@ -166,6 +171,43 @@ class GiftCardAdminCardForm extends FormBase {
       '#limit_validation_errors' => [['change_type'], ['change_amount'], ['change_note']],
     ];
     return $form;
+  }
+
+  /**
+   * "Where it stands": each part of the card, what disagrees, what's left.
+   *
+   * The same reading as drush mh:gift-card-check, so staff and whoever is
+   * debugging look at one answer.
+   */
+  protected function standing(object $card): array {
+    $result = $this->inspector->inspect($card);
+    $labels = ['unused' => $this->t('Not used yet'), 'used' => $this->t('Used'), 'void' => $this->t('Void'), 'n/a' => ''];
+    $rows = [];
+    foreach ($result['parts'] as [$part, $state, $text]) {
+      $rows[] = [['data' => $part, 'header' => TRUE], (string) ($labels[$state] ?? $state), $text];
+    }
+    $build = [
+      '#type' => 'details',
+      '#title' => $this->t('Where it stands'),
+      '#open' => TRUE,
+      'parts' => ['#type' => 'table', '#rows' => $rows],
+    ];
+    if ($result['problems']) {
+      $build['problems'] = [
+        '#theme' => 'item_list',
+        '#title' => $this->t('Needs a look'),
+        '#items' => $result['problems'],
+        '#attributes' => ['class' => ['messages', 'messages--warning']],
+      ];
+    }
+    if ($result['next']) {
+      $build['next'] = [
+        '#theme' => 'item_list',
+        '#title' => $this->t('What the holder can still do'),
+        '#items' => $result['next'],
+      ];
+    }
+    return $build;
   }
 
   /**
