@@ -1,0 +1,90 @@
+/**
+ * Gift card order pages: the "Who is it for?" and "How do you want the card?"
+ * choices read as choices, not as buttons. The site-wide contribution page
+ * style (asset injector contribution_donation_pages) paints them solid red
+ * when picked and grey otherwise, so a picked choice looked like the "Review
+ * your order" button and the other one looked disabled (JR 2026-11-24).
+ * Scoped to the gift card profile; donation pages are unchanged.
+ */
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options .crm-option-label-pair {
+  display: contents;
+}
+
+/* Keep the real radio for keyboards and screen readers, just not visible. */
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options input[type="radio"] {
+  display: inline-block !important;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  opacity: 0;
+}
+
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-width: 9rem;
+  margin: 0;
+  padding: 0.7rem 1rem 0.7rem 2.6rem;
+  text-align: left;
+  font-weight: 500;
+  color: var(--mh-color-neutral-900, #1e1f24);
+  background: var(--mh-color-surface, #fff);
+  border: 2px solid var(--mh-color-neutral-300, #c2c2c2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Empty circle on each choice; filled with a tick when picked. */
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options label::before {
+  content: "";
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: -0.55rem;
+  border: 2px solid var(--mh-color-neutral-500, #7c7c7c);
+  border-radius: 50%;
+  background: var(--mh-color-surface, #fff);
+}
+
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options label:hover {
+  background: var(--mh-color-surface-muted, #f8f9fa);
+  border-color: var(--mh-color-neutral-500, #7c7c7c);
+}
+
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options input[type="radio"]:checked + label {
+  color: var(--mh-color-neutral-900, #1e1f24);
+  background: #fbf3f3;
+  border: 2px solid var(--mh-color-brand-primary, #8b1919);
+  font-weight: 600;
+}
+
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options input[type="radio"]:checked + label::before {
+  border-color: var(--mh-color-brand-primary, #8b1919);
+  background: var(--mh-color-brand-primary, #8b1919)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 0.8rem no-repeat;
+}
+
+.crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options input[type="radio"]:focus-visible + label {
+  outline: 3px solid var(--mh-color-brand-secondary, #78c0f3);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .crm-container .crm-profile-name-gift_card_details .crm-multiple-checkbox-radio-options label {
+    width: 100%;
+  }
+}

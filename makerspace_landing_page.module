@@ -196,11 +196,66 @@ function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
       #crm-payment-js-billing-form-container .mh-card-heading { font-weight: 600; margin: 0 0 8px; }
     ');
     \Civi::resources()->addScript('CRM.$(function($) { $("#crm-payment-js-billing-form-container").prepend($("<p class=\"mh-card-heading\"></p>").text(' . $heading . ')); });');
+    // Recipient questions only for a gift; the date sits under the delivery
+    // choice that refers to it; choices styled as choices (JR 2026-11-24).
+    $path = base_path() . \Drupal::service('extension.list.module')->getPath('makerspace_landing_page');
+    \Civi::resources()->addStyleUrl($path . '/css/gift-card-form.css');
+    \Civi::resources()->addScriptUrl($path . '/js/gift-card-form.js', ['region' => 'page-footer']);
     // No mailed Jumpstart cards: mailing is a staff step (JR 2026-11-12).
     // The ledger also treats a "mail" choice on a Jumpstart as email.
     if (($form->_values['name'] ?? '') === 'jumpstart_gift') {
       \Civi::resources()->addScript('CRM.$(function($) { $("input[type=radio][value=mail]").each(function() { $("label[for=\'" + this.id + "\']").hide(); $(this).hide(); }); });');
     }
+  }
+}
+
+/**
+ * Implements hook_civicrm_validateForm().
+ *
+ * Same rules as js/gift-card-form.js, for anyone without JavaScript: a gift
+ * needs the recipient's name, "email it to the recipient" needs a gift and a
+ * valid recipient email. Without this, a card bought "for myself" with
+ * "email it to the recipient" would have nobody to send to.
+ */
+function makerspace_landing_page_civicrm_validateForm($formName, &$fields, &$files, &$form, &$errors) {
+  if ($formName !== 'CRM_Contribute_Form_Contribution_Main') {
+    return;
+  }
+  $type_id = (int) ($form->_values['financial_type_id'] ?? 0);
+  if (!$type_id || \CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution', 'financial_type_id', $type_id) !== 'Gift Card') {
+    return;
+  }
+  try {
+    $ids = [];
+    foreach (\Civi\Api4\CustomField::get(FALSE)
+      ->addSelect('id', 'name')
+      ->addWhere('custom_group_id:name', '=', 'Gift_Card')
+      ->addWhere('name', 'IN', ['Gift_For', 'Recipient_Name', 'Recipient_Email', 'Delivery'])
+      ->execute() as $f) {
+      $ids[$f['name']] = 'custom_' . $f['id'];
+    }
+  }
+  catch (\Throwable $e) {
+    return;
+  }
+  if (count($ids) < 4 || !array_key_exists($ids['Gift_For'], $fields)) {
+    return;
+  }
+  $gift = ($fields[$ids['Gift_For']] ?? '') === 'gift';
+  $to_recipient = ($fields[$ids['Delivery']] ?? '') === 'recipient';
+  $name = trim((string) ($fields[$ids['Recipient_Name']] ?? ''));
+  $email = trim((string) ($fields[$ids['Recipient_Email']] ?? ''));
+  if ($to_recipient && !$gift) {
+    $errors[$ids['Delivery']] = t('A card for yourself is emailed to you. Choose "Email it to me", or choose "Someone else" above.');
+  }
+  if ($gift && $name === '') {
+    $errors[$ids['Recipient_Name']] = t("Please enter the recipient's name. It is printed on the card.");
+  }
+  if ($gift && $to_recipient && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $errors[$ids['Recipient_Email']] = t("Please enter the recipient's email address so we can send them the card.");
+  }
+  elseif ($gift && $email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    $errors[$ids['Recipient_Email']] = t("Please check the recipient's email address.");
   }
 }
 
