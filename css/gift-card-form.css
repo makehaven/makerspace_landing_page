@@ -88,3 +88,19 @@
     width: 100%;
   }
 }
+
+/* The gift card questions, moved up under the price (js/gift-card-form.js),
+   sit in an outlined panel so "Who is it for?" is not missed. */
+.crm-container .mh-gift-card-questions {
+  margin: 12px 0 18px;
+  padding: 14px 16px;
+  background: var(--mh-color-surface, #fff);
+  border: 2px solid var(--mh-color-brand-primary, #8b1919);
+  border-radius: 6px;
+}
+
+.crm-container .mh-gift-card-questions .mh-gift-card-error {
+  margin-top: 0.4rem;
+  color: var(--mh-color-brand-primary, #8b1919);
+  font-weight: 600;
+}

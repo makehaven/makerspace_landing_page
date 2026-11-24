@@ -172,8 +172,10 @@ function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
   if (!$type_id || \CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution', 'financial_type_id', $type_id) !== 'Gift Card') {
     return;
   }
+  // Without a review step (JR 2026-11-24: none on the gift card pages), the
+  // first button is the one that charges the card.
   $labels = [
-    '_qf_Main_upload' => t('Review your order'),
+    '_qf_Main_upload' => empty($form->_values['is_confirm_enabled']) ? t('Place order') : t('Review your order'),
     '_qf_Confirm_next' => t('Place order'),
   ];
   if ($form->elementExists('buttons')) {
