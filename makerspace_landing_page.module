@@ -165,11 +165,15 @@ function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
     \Civi::resources()->addScript('CRM.$(function($) { $("#discountcode").on("change blur", function() { var m = /^\\s*([0-9a-f]{4})[\\s._-]*([0-9a-f]{4})\\s*$/i.exec(this.value); if (m) { this.value = (m[1] + "-" + m[2]).toUpperCase(); } }); $("#discountcode").closest("form").on("submit", function() { $("#discountcode").trigger("change"); }); });');
     return;
   }
-  if (!in_array($formName, ['CRM_Contribute_Form_Contribution_Main', 'CRM_Contribute_Form_Contribution_Confirm'], TRUE)) {
+  if (!in_array($formName, ['CRM_Contribute_Form_Contribution_Main', 'CRM_Contribute_Form_Contribution_Confirm', 'CRM_Contribute_Form_Contribution_ThankYou'], TRUE)) {
     return;
   }
   $type_id = (int) ($form->_values['financial_type_id'] ?? 0);
   if (!$type_id || \CRM_Core_PseudoConstant::getName('CRM_Contribute_BAO_Contribution', 'financial_type_id', $type_id) !== 'Gift Card') {
+    return;
+  }
+  if ($formName === 'CRM_Contribute_Form_Contribution_ThankYou') {
+    _makerspace_landing_page_gift_card_print_button($form);
     return;
   }
   // Without a review step (JR 2026-11-24: none on the gift card pages), the
@@ -194,7 +198,8 @@ function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
     $heading = json_encode((string) t('Card details'));
     \Civi::resources()->addStyle('
       #crm-payment-js-billing-form-container { border: 2px solid var(--mh-color-brand-primary, #8b1919); border-radius: 6px; padding: 14px 16px; margin: 12px 0 18px; background: #fff; }
-      #crm-payment-js-billing-form-container #card-element { padding: 10px 12px; border: 1px solid #b9b2ad; border-radius: 4px; }
+      #crm-payment-js-billing-form-container #card-element { max-width: none; margin: 0; padding: 10px 12px; background: #fff; border: 1px solid #b9b2ad; border-radius: 4px; box-shadow: none; }
+      #crm-payment-js-billing-form-container #card-element.StripeElement--focus { border-color: var(--mh-color-brand-primary, #8b1919); }
       #crm-payment-js-billing-form-container .mh-card-heading { font-weight: 600; margin: 0 0 8px; }
     ');
     \Civi::resources()->addScript('CRM.$(function($) { $("#crm-payment-js-billing-form-container").prepend($("<p class=\"mh-card-heading\"></p>").text(' . $heading . ')); });');
@@ -203,12 +208,84 @@ function makerspace_landing_page_civicrm_buildForm($formName, &$form) {
     $path = base_path() . \Drupal::service('extension.list.module')->getPath('makerspace_landing_page');
     \Civi::resources()->addStyleUrl($path . '/css/gift-card-form.css');
     \Civi::resources()->addScriptUrl($path . '/js/gift-card-form.js', ['region' => 'page-footer']);
+    // Photos of makers at work above the intro (JR 2026-11-24: "could
+    // benefit from some images of makers doing things"). Web-size copies of
+    // front-page and GEMS photos already public on the site.
+    $photos = [
+      'jumpstart_gift' => [
+        'jumpstart-hero' => 'A member hand-planing a board in the woodshop',
+        'gem-intro-1' => 'A GEMS participant with the shelf she built',
+        'gem-intro-2' => 'A GEMS participant holding up the bag he made',
+      ],
+      'membership_gift_card' => [
+        'woodworking' => 'Members working together at a woodshop bench',
+        'welding' => 'Members welding in the metal shop',
+        'blacksmith' => 'Members at the anvil in the blacksmithing area',
+      ],
+      'workshop_gift_card' => [
+        'bags' => 'A class participant showing the bags she sewed',
+        'woodworking' => 'An instructor helping a class at a woodshop bench',
+        'gem-intro-2' => 'A participant holding up the bag he made in class',
+      ],
+    ][$form->_values['name'] ?? ''] ?? [];
+    if ($photos) {
+      $html = '<div class="mh-gift-photos">';
+      foreach ($photos as $file => $alt) {
+        $html .= '<img src="' . $path . '/images/gift/' . $file . '.jpg" alt="' . htmlspecialchars($alt) . '" width="720" height="540" loading="eager">';
+      }
+      $html .= '</div>';
+      \Civi::resources()->addScript('CRM.$(function($) { var $intro = $("#intro_text"); var $photos = $(' . json_encode($html) . '); if ($intro.length) { $photos.insertBefore($intro); } });');
+    }
     // No mailed Jumpstart cards: mailing is a staff step (JR 2026-11-12).
     // The ledger also treats a "mail" choice on a Jumpstart as email.
     if (($form->_values['name'] ?? '') === 'jumpstart_gift') {
       \Civi::resources()->addScript('CRM.$(function($) { $("input[type=radio][value=mail]").each(function() { $("label[for=\'" + this.id + "\']").hide(); $(this).hide(); }); });');
     }
   }
+}
+
+/**
+ * Adds "Print your gift card" to the top of a gift card thank-you page.
+ *
+ * The receipt email has the same button; JR (2026-11-24) asked for it on the
+ * page too, so the buyer can print straight away. Shown only once the
+ * payment is Completed (the card page says "not ready yet" otherwise). The
+ * link carries the order's invoice id as its key, as the receipt's does.
+ */
+function _makerspace_landing_page_gift_card_print_button($form): void {
+  try {
+    $contribution_id = method_exists($form, 'getContributionID') ? (int) $form->getContributionID() : 0;
+    if (!$contribution_id) {
+      return;
+    }
+    $c = \Civi\Api4\Contribution::get(FALSE)
+      ->addSelect('invoice_id', 'contribution_status_id:name')
+      ->addWhere('id', '=', $contribution_id)
+      ->execute()
+      ->first();
+  }
+  catch (\Throwable $e) {
+    return;
+  }
+  if (!$c || ($c['contribution_status_id:name'] ?? '') !== 'Completed' || empty($c['invoice_id'])) {
+    return;
+  }
+  $url = \Drupal\Core\Url::fromRoute('makerspace_landing_page.gift_card_print', [
+    'contribution_id' => $contribution_id,
+    'key' => $c['invoice_id'],
+  ])->toString();
+  $html = '<div class="mh-gift-print">'
+    . '<p class="mh-gift-print__lead">' . htmlspecialchars((string) t('Your gift card is ready.')) . '</p>'
+    . '<a class="button primary mh-gift-print__button" href="' . htmlspecialchars($url) . '" target="_blank" rel="noopener"><i class="fas fa-print" aria-hidden="true"></i> ' . htmlspecialchars((string) t('Print your gift card')) . '</a>'
+    . '<p class="mh-gift-print__help">' . htmlspecialchars((string) t('Opens the card in a new tab. Print it on one side of a letter-size sheet and fold it twice. The same button is in your receipt email.')) . '</p>'
+    . '</div>';
+  \Civi::resources()->addStyle('
+    .mh-gift-print { margin: 0 0 20px; padding: 16px 18px; text-align: center; background: #fff; border: 2px solid var(--mh-color-brand-primary, #8b1919); border-radius: 6px; }
+    .mh-gift-print__lead { margin: 0 0 10px; font-size: 1.15rem; font-weight: 600; }
+    .mh-gift-print__button { display: inline-block; font-size: 1.15rem; text-decoration: none; }
+    .mh-gift-print__help { margin: 10px 0 0; font-size: 0.9rem; color: var(--mh-color-neutral-700, #4a4a4a); }
+  ');
+  \Civi::resources()->addScript('CRM.$(function($) { var $box = $(' . json_encode($html) . '); var $at = $("#thankyou_text"); if ($at.length) { $box.insertBefore($at); } else { $("#crm-main-content-wrapper, .crm-contribution-thankyou-form-block").first().prepend($box); } });');
 }
 
 /**
